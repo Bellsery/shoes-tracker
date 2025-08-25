@@ -45,6 +45,9 @@ STELLAZHI: dict[int, list[str]] = {
     17: ["067","068","069","070","071","072","073","074","075","076"],
 }
 
+# Быстрый индекс: номер т/б -> стеллаж
+TB_TO_SHELF: dict[str, int] = {tb: shelf for shelf, tbs in STELLAZHI.items() for tb in tbs}
+
 # ----- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ -----
 def normalize_input_to_tb_set(raw: str) -> set[str]:
     """
@@ -179,7 +182,22 @@ async def on_menu_click(call: CallbackQuery):
 
 @dp.message(F.text & ~F.text.startswith("/"))
 async def echo_text(message: Message):
-    result = compute_tb_result(message.text)
+    text = message.text.strip()
+
+    # Если запрос заканчивается на ?
+    if text.endswith("?"):
+        num = text[:-1].strip()   # убираем знак вопроса
+        if num.isdigit():
+            tb = str(int(num)).zfill(3)
+            shelf = TB_TO_SHELF.get(tb)
+            if shelf is None:
+                await message.answer(f"❌ В парке нет башмака {tb}")
+            else:
+                await message.answer(f"Башмак {tb} — стеллаж {shelf}")
+            return
+
+    # иначе обычная логика подсчёта остатков
+    result = compute_tb_result(text)
     await message.answer(result)
 async def http_ok(request):
     return web.Response(text="OK")
