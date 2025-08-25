@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from aiohttp import web
-from aiohttp import web
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
@@ -201,20 +200,7 @@ async def catch_all(update: Update):
             await update.message.answer("👋 Я здесь. Получаю апдейты.")
         except Exception as e:
             logging.exception(f"Reply failed: {e}")
-async def http_ok(request):
-    return web.Response(text="OK")
 
-async def run_http_server():
-    app = web.Application()
-    app.router.add_get("/", http_ok)
-    port = int(os.getenv("PORT", "10000"))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, host="0.0.0.0", port=port)
-    await site.start()
-    logging.info(f"HTTP server started on port {port}")
-
-# ----- ЗАПУСК -----
 # ----- ЗАПУСК -----
 async def main():
     if not PUBLIC_URL:
@@ -224,6 +210,7 @@ async def main():
     # ставим webhook у Telegram
     await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
     logging.info(f"Webhook set to: {webhook_url}")
+    logging.info(f"PUBLIC_URL (RENDER_EXTERNAL_URL) = {PUBLIC_URL}")
 
     # запускаем aiohttp-сервер
     app = await make_app()
