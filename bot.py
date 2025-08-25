@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 from aiohttp import web
+from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import (
@@ -12,7 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "shoes-secret")
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+PUBLIC_URL = os.getenv("RENDER_EXTERNAL_URL")  # Render даёт сам
 if not BOT_TOKEN:
     raise RuntimeError("Не найден BOT_TOKEN. Создай .env и вставь токен бота.")
 
@@ -178,7 +182,16 @@ async def on_menu_click(call: CallbackQuery):
 async def echo_text(message: Message):
     result = compute_tb_result(message.text)
     await message.answer(result)
+async def http_ok(request):
+    return web.Response(text="OK")
 
+async def make_app() -> web.Application:
+    app = web.Application()
+    app.router.add_get("/", http_ok)
+    handler = SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET)
+    handler.register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
+    return app
 # ----- DIAG CATCH-ALL -----
 @dp.update()
 async def catch_all(update: Update):
@@ -202,12 +215,28 @@ async def run_http_server():
     logging.info(f"HTTP server started on port {port}")
 
 # ----- ЗАПУСК -----
+# ----- ЗАПУСК -----
 async def main():
-    # Запускаем HTTP-сервер (для Render) и Telegram-бота параллельно
-    await asyncio.gather(
-        run_http_server(),
-        dp.start_polling(bot)
-    )
+    if not PUBLIC_URL:
+        raise RuntimeError("Не задан PUBLIC_URL (RENDER_EXTERNAL_URL). Render должен сам его выставить.")
+    webhook_url = f"{PUBLIC_URL.rstrip('/')}{WEBHOOK_PATH}"
+
+    # ставим webhook у Telegram
+    await bot.set_webhook(url=webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
+    logging.info(f"Webhook set to: {webhook_url}")
+
+    # запускаем aiohttp-сервер
+    app = await make_app()
+    port = int(os.getenv("PORT", "10000"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    logging.info(f"HTTP server started on port {port}")
+
+    # держим процесс живым
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())
