@@ -9,4 +9,6 @@ services:
     autoDeploy: true
     envVars:
       - key: BOT_TOKEN
-        sync: false
+        value: 8373827418:AAH6C7xavJyMQFy6VGLlD3jfn1hHmDGjSXg
+      - key: WEBHOOK_SECRET
+        value: "shoes-secret-2025"
