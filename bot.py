@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import (
@@ -188,10 +188,26 @@ async def catch_all(update: Update):
             await update.message.answer("👋 Я здесь. Получаю апдейты.")
         except Exception as e:
             logging.exception(f"Reply failed: {e}")
+async def http_ok(request):
+    return web.Response(text="OK")
+
+async def run_http_server():
+    app = web.Application()
+    app.router.add_get("/", http_ok)
+    port = int(os.getenv("PORT", "10000"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    logging.info(f"HTTP server started on port {port}")
 
 # ----- ЗАПУСК -----
 async def main():
-    await dp.start_polling(bot)
+    # Запускаем HTTP-сервер (для Render) и Telegram-бота параллельно
+    await asyncio.gather(
+        run_http_server(),
+        dp.start_polling(bot)
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
